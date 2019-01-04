@@ -17,6 +17,8 @@
 \author{Sophie van den Eerenbeemt\\0954445}
 \date{\today}
 
+\pagestyle{plain}
+
 % Document
 \begin{document}
 \maketitlepage
@@ -1034,7 +1036,7 @@ For (Second) pre-image resistance, it usually is the best possible attack, if no
 
     Complexity is $i + (j-i) \le \text{length of tail + length of cycle} \approx 2^{n/2}$.
 
-    \subsection{Applications of hash functions}
+    \subsubsection{Applications of hash functions}
 
     \begin{itemize}
         \item digital signatures
@@ -1045,7 +1047,45 @@ For (Second) pre-image resistance, it usually is the best possible attack, if no
         \item MAC: message authentication code
     \end{itemize}
 
-    \subsection{Design of hash functions}
+    The main application of hash functions is \textit{integrity}: detect unwanted modification in data.
+    \begin{itemize}
+        \item unintentional: hashes, error correction
+        \item intentional:
+        \begin{itemize}
+            \item A send $(m,h(m))$
+            \item E replaces with $(m', h(m'))$
+            \item Bob receives $(m', h(m'))$
+        \end{itemize}
+
+        Better idea, first encrypt:
+        \begin{itemize}
+            \item A encrypts: $c = Enc_{k}(m)$
+            \item A send $(c,h(m))$
+            \item E cannot check $h$
+            \item B decrypts $m = Dec_{k'}(c)$
+            \item B checks $h = h(m)$
+        \end{itemize}
+        This is abuse of encryption to ensure integrity.
+
+        Or: A encrypts $(m,h)$
+    \end{itemize}
+
+    A better idea is to use \textit{MAC: message authentication code}.
+    Example:
+    \[
+        MAC_{k_{auth}} = h(k_{auth}, m)
+    \]
+    where $k_{auth}$ is protected by pre-image resistance and is a symmetric key.
+    A can send this MAC together with the message.
+    E cannot change this, because she doesn't have the right key.
+
+    \textit{HMAC} is a special form of MAC
+    \[
+        HMAC(k,m) = h(k \oplus opad) || h(k \oplus ipad) || m
+    \]
+    where opad is the outer padding, constant bitstring, and ipad is the inner padding.
+
+    \subsubsection{Design of hash functions}
 
     All these hash functions have the Merkle-Damgard design:
     \begin{itemize}
@@ -1081,14 +1121,144 @@ See Figure~\ref{md}.
     Solution: MD-strenghening:
     See Figure~\ref{md-strengh}.
 
+    \begin{figure}
+        \centering
+        \includegraphics[width=\textwidth]{md-strength.PNG}
+        \caption{Merkle-Damgard strengthening}
+        \label{md-strength}
+    \end{figure}
+
+    \newpage
+    \section{Symmetric encryption: block ciphers}
+
+    Idea: split up message into blocks of a given bit size.
+    Apply \textit{padding}: to bring the message bit size to multiple of block size.
+
+    If you want to use symmetric encryption in the form of a block cypher, there is three things you should do:
+    \begin{itemize}
+        \item Choose a block cipher
+        \item Choose a mode of operation
+        \item Choose a way to MAC things - error detection
+    \end{itemize}
+
+    \subsection{Modes of operation}
+\subsubsection{ECB}
+        See figure~\ref{moo1}.
+        Problem: \textit{ECB-Penguin}.
+        If you have a large picture, all white areas will be turned green, for example.
+        So the picture is encrypted, but still recognizable.
+        Decryption here is pretty straight forward.
+
 \begin{figure}
     \centering
-    \includegraphics[width=\textwidth]{md-strength.PNG}
-    \caption{Merkle-Damgard strengthening}
-    \label{md-strength}
+    \includegraphics[width=\textwidth]{moo1.PNG}
+    \caption{Mode of Operation}
+    \label{moo1}
 \end{figure}
 
+\subsubsection{CBC}
+        CBC - Cipher Block Chaining, see figure~\ref{cbc}.
+        For decryption, see figure~\ref{cbcdec}.
+        Note that encryption cannot be parallelized, whereas decryption can be parallelized.
 
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{cbc.PNG}
+    \caption{Mode of Operation: CBC encryption}
+    \label{cbc}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{cbcdec.PNG}
+    \caption{Mode of Operation: CBC decryption}
+    \label{cbcdec}
+\end{figure}
+
+    Assume in a ciphertext, 1 bit is wrong, then:
+    \begin{itemize}
+        \item CBC-decryption gives one totally wrong block, in the next block only one bit wrong.
+        \item CBC-encryption gives all blocks after error will be wrong.
+    \end{itemize}
+
+    \subsubsection{OFB - Output Feedback Mode}
+
+    See figure~\ref{ofb}.
+    Do the decryption as an exercise!
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{ofb.PNG}
+    \caption{Mode of Operation: OFB decryption}
+    \label{ofb}
+\end{figure}
+
+    \subsection{DES - Data Encryption Standard}
+
+    Properties:
+    \begin{itemize}
+        \item Block size: 64 bits
+        \item Key size: 64 bits, weakened to 56 bits effective key size and 8 bits redundant, which are the last bit of each byte.
+        Used as a parity bit, in each byte number of 1-bits is odd.
+        \item $2^{56}$ size key space is too small: brute force attacks.
+    \end{itemize}
+
+    Remember the main design principles for symmetric encryption:
+    \begin{itemize}
+        \item confusion (e.g. by substitution)
+        \ite diffusion (e.g. by transposition)
+    \end{itemize}
+    These are still recognizable in DES.
+
+    The Feistel-cipher design: see figure~\ref{feistel}.
+    f is a round function, same for all rounds.
+    \[
+        f = f(k_i, R_{i-1})
+    \]
+    $L_i,R_i,L'_{i}, R'_i$ are halves.
+    FP is the final permutation.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{feistel.PNG}
+    \caption{Feistel-cipher design}
+    \label{feistel}
+\end{figure}
+
+    For decryption, it is not necessary to invert $f$.
+    $f$ needs not be invertible.
+    Why is there no swap after the 16 th round?
+    You are going to do a permutation anyway.
+    Also, notice the symmetry,
+    \[
+        FP = IP^{-1},
+    \]
+    decryption is same as encryption, except the subkeys are in reverse order.
+
+    Function $f$: see figure~\ref{feistelf}.
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{feistelf.PNG}
+    \caption{Feistel, function $f$}
+    \label{feistelf}
+\end{figure}
+
+    Key schedule: see figure~\ref{feistelkey}.
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{feistelkey.PNG}
+    \caption{Feistel, key schedule}
+    \label{feistelkey}
+\end{figure}
+
+    There are a total of 28 rotations, but they are 28 bits long, which means
+    \[
+        C_{16} = C_0, \quad D_{16} = D_0.
+    \]
+    Again, encryption and decryption can be done with almost the same software.
+
+    \newpage
+    \section{Asymmetric encryption}
 
 \end{document}
 
