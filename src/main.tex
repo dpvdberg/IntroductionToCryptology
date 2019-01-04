@@ -1206,7 +1206,7 @@ See Figure~\ref{md}.
     Remember the main design principles for symmetric encryption:
     \begin{itemize}
         \item confusion (e.g. by substitution)
-        \ite diffusion (e.g. by transposition)
+        \item diffusion (e.g. by transposition)
     \end{itemize}
     These are still recognizable in DES.
 
@@ -1257,8 +1257,361 @@ See Figure~\ref{md}.
     \]
     Again, encryption and decryption can be done with almost the same software.
 
+    \subsubsection{2DES}
+
+    DES: too weak because it uses 56 bits.
+    Solution: 2DES.
+    Uses DES twice:
+    \[
+        c = DES_{k_2}(DES_{k1}(m))
+    \]
+    Key is $(k_1, k_2)$, effective keylength is 112 bits.
+
+    We assume plaintext is known.
+    Attack on 2DES: meet-in-the-middle:
+    \begin{itemize}
+        \item Compute $DES_{k_1}(m)$ for all $2^{56}$ possible $k_1$
+        \item Sort, store in table
+        \item Compute $DES_{k_2}^{-1}(c)$ for all $k_2$ all possible keys
+        \begin{itemize}
+            \item try if it's in the table
+            \item if not, forget
+            \item if it is: bingo
+        \end{itemize}
+    \end{itemize}
+
+    Complexity of this attack: we have $2^{56}$ encryption and at most $2^{56}$ decryption, so time is $2^{57}$, at the expense of $2^{56} \times 56$ storage.
+    So 2DES is not really more secure than DES.
+
+    \subsubsection{3DES}
+
+    Works as follows:
+    \[
+        DES_{k_3}(DES_{k_2}(DES_{k_1}(m)))
+    \]
+    has security of not 168 but 112 bits.
+
+    Practice: 2-key 3DES:
+    \[
+        DES_{k_1}(DES_{k_2}^{-1}(DES_{k_1}(m)))
+    \]
+
+    Today's standard: AES - Reijndael, advanced encryption Standard.
+
     \newpage
     \section{Asymmetric encryption}
+
+    \subsection{RSA}
+
+    \subsubsection{Number theory reminder}
+
+    Modular arithmetic:
+    \begin{itemize}
+        \item $\mathbb{Z}_n = \set{0,1,\dots,n-1}$ with rule that $n$ is the modulus, i.e. $n=0$.
+        \item $\mathbb{Z}_n^{*} (\mathbb{Z}_n^{x}) = $ subset of $\mathbb{Z}_n$ of all $a$ such that $gcd(a,n) = 1$.
+        If $n = p$ is prime:
+        \[
+            \mathbb{Z}_p^{*} = \set{1,\dots,p-1}
+        \]
+    \end{itemize}
+
+    \textbf{Fermat} If $p$ is prime, $a \in \mathbb{Z}_p^{*}$, then $a^{p-1} = 1 (\mod p)$.
+
+    \textbf{Euler, special case} If $p,q$ are primes, $p \ne q$, $n = pq$ and $a \in \mathbb{Z}_n^{*}$, then $a^{\phi(n)} = 1 (\mod n)$, where $\phi(n) = (p-1)(q-1)$.
+
+    \textbf{CRT - Chinese Remainder Theorem, special case} Let $p,q$ be primes, $p \ne q$, then
+    \[
+        \begin{cases}
+            x &= b_1 (\mod p) \\
+            y &= b_2 (\mod q)
+        \end{cases}
+    \]
+    has one solution $(\mod n)$, where $n = p \cdot q$.
+
+    \textbf{Example}: solve
+    \[
+        \begin{cases}
+            x &= 3 (\mod 5) \\
+            y &= 4 (\mod 7)
+        \end{cases}
+    \]
+    $x = 3 \mod 5$, which means there is some $k \in \mathbb{Z}$ such that $x = 3 + k \cdot 5$.
+    Plug into second argument:
+    \begin{align*}
+        3 + k \cdot 5 &= 4 \mod 7 \\
+        5k &= 1 \mod 7 \\
+        5^{-1} \mod 7 &= 3 \text{ because } 3 \cdot 5 = 15 = 1 \mod 7
+    \end{align*}
+    So $k = 3$, then $x = 18$.
+
+    Actually:
+    \[
+        5k = 1 + 7 L
+    \]
+    for some $l \in \mathbb{Z}$.
+    There is some $m \in \mathbb{Z}$ such that
+    \begin{align*}
+        k &= 3 + 35 m \\
+        x &= 3 + (3 + 7m) \cdot 5 \\
+        &= 18 + 35 m \\
+        &= 18 \mod 35
+    \end{align*}
+
+    In general:
+    \[
+        x = b_1 \mod p
+    \]
+    means there is a $k \in \mathbb{Z}$ such that $x = b_1 + k \cdot p$.
+    Plug this into the second congruence:
+    \begin{align*}
+        b_1 + k \cdot p &= b_2 \mod q  \\
+        k \cdot p &= b_2 - b_1 \mod q \\
+        k &= (p^{-1} \mod q) \cdot (b_2 - b_1) \mod q \\
+        k &= u (b_2 - b_1) + m \cdot q
+    \end{align*}
+    which means
+    \begin{align*}
+        x &= b_1 + u \cdot p (b_2 - b_1) + m \cdot p \cdot q \\
+        x &= b_1 + u \cdot p (b_2 - b_1) \mod n\\
+    \end{align*}
+    where $u = p^{-1} \mod q$, so $up = 1 \mod q$.
+
+    \subsubsection{Calculating modulo $n$}
+
+    After every intermediate step, reduce to $\set{0,1,\dots,n-1}$, by division with remainder: divide by $n$, keep only remainder.
+
+    \textbf{Exponantiation} $\mod n$:
+    Problem: given $a \in \mathbb{Z}_n^*$, $b \in \set{1,2,\dots,\phi(n)-1}$, compute $a^b (\mod n)$ efficiently.
+    Note: $a^b$ without modulus has $\log_2 (a^b)$ bits, but $log_2(a^b) = b \cdot \log_2 (a)$.
+    For $n$ of $2048$ bits, $log_2 (n \le 2-48)$, but $b \approx 2^{2048}$, which means $a^b$ has $2^{2059}$ bits!
+    This means we cannot simply calculate and reduce after.
+
+    How to compute $a^b (\mod n)$?
+    Not by $a \times a \times a \times \dots \mod n$, with $b-1$ multiplication, reducing in every intermediate step is still impossible.
+    Can do with \textit{square-and-multiply}.
+    Write
+    \[
+        b = b_0 + b_1 \cdot 2 + b_2 \cdot 2^2 + \dots + b_{2047} 2^{2047}
+    \]
+    with $b_0, b_1, \dots \in \set{0,1}$.
+    Then
+    \[
+        a^b = a^{b_0} \cdot (a^2)^{b_1} \cdot \dots \cdot (a^{2^{2047}})^{b_{2047}}.
+    \]
+    If $b_i = 0$, leave out $(a^{2^{i}})^{b_i}$, if $b_i = 1$, leave it in.
+    Compute
+    \[
+        a \to a^2 \to a^{2^2} \to a^{2^3} \to \dots
+    \]
+    After $2047$ squarings, $a^{2^{2047}}$.
+    Then multiply all those $a^{2^{i}}$ for which $b_i = 1$, which is at most $2047$ multiplications, on average $\approx 1024$.
+    After every multiplication, reduce $\mod n$.
+
+    Complexity of exponantiation of $n$-bit number is $O(n^3)$ naively, $O(N^{2.58})$ if one uses Karatsuba.
+
+    \subsection{RSA - Rivest Shamir Adleman}
+
+    We have three algorithms: key pair generation, encryption and decryption.
+
+    \subsubsection{Key pair generation}
+
+    \begin{itemize}
+        \item Compute primes $p,q$ with $p \ne q$, random, size today $\le 1024$ bits.
+        \item Compute $n = p \cdot q$.
+        \item Compute $\phi(n) = (p-1)(q-1)$.
+        \item May throw away $p,q$ now.
+        \item Keep $p,q$ secret.
+        \item Take some $e$, $gcd(e,\phi(n)) = 1$, (in practice, often $e = 65537$).
+        \item Compute $d = e^{-1} \mod \phi(n)$, using euclid's algorithm.
+        \item Then public key is $(n,e)$ and private key is $(n,d)$.
+    \end{itemize}
+
+    \subsubsection{Encryption}
+
+    Assume plaintext can be seen as number $> 0$ and $< n$.
+    Plaintext $m \in \mathbb{Z}_n^*$.
+    \begin{itemize}
+        \item Ciphertext: $c = m^{e} \mod n$
+    \end{itemize}
+
+    \subsubsection{Decryption}
+
+    \begin{itemize}
+        \item Ciphertext: $c \in \mathbb{Z}_n^*$
+        \item Decryption: $c^d \mod n$
+    \end{itemize}
+
+    Why does this decryption return $m$:
+    \[
+        c^d = (m^e)^d = m^{e \cdot d}
+    \]
+    There is some $k \in \mathbb{Z}$ such that $e \cdot d = 1 + k \cdot \phi(n)$, that's how e and d were made, so
+    \[
+        c^d = m^{1 + k \cdot \phi(n)} = m^1 \cdot (m^{\phi(n)})^{k} = m \mod n
+    \]
+    using Euler's theorem in the last step.
+
+    Up until now, we have seen schoolbook RSA.
+
+    \subsection{RSA signatures}
+
+    Key pair generation: same as before.
+
+    Signature generation:
+    \begin{itemize}
+        \item Message $m \in \mathbb{Z}_n^*$
+        \item Signature: $s = m^{d} \mod n$
+    \end{itemize}
+
+    Signature verification:
+    \begin{itemize}
+        \item Get message $m$ and signature $s$ and public key $(n,e)$
+        \item Check: $m = s^e \mod n$
+    \end{itemize}
+
+    Why does this work?
+    Same as before.
+
+    \subsection{Number sizes}
+
+    Usually, $p,q$ are the same bit size.
+
+    Tempting to use small exponents.
+    Choosing public exponent $e$ small: not a big problem, usually $e > 3$.
+    Popular choice: $e = 65537 = 2^{16} + 1$, because it is small, it has only 2 one bits and it is prime, which means the condition on $e$ is very likely to hold.
+    With this, you can encrypt as fast as you can hope for.
+
+    Can we speed up decryption?
+    If we choose $d$ too small, brute force attacks are possible.
+    Also, if $e$ is small, $d$ is necessarily large...
+
+    \textit{RSA-CRT} Person who knows $d$, also can know $p,q$.
+    \begin{itemize}
+        \item Compute and store $d_p = d \mod p-1$ and $d_q = d \mod q-1$.
+        \item Decrypt: compute $m_p = c^{dp} \mod p$ and $m_q = c^{d_q} \mod q$.
+        \item Also store $u = p^{-1}(\mod q)$.
+        \item Then CRT: $m = m_p + pu (m_q - m_p)$.
+    \end{itemize}
+    The speedup is that we replace one exponantial size $n$ by two exponantial size $\frac{1}{2}n + \text{ cheap CRT }$.
+    With naive multiplication method, $c n^3$ is replaced by $2c(\frac{1}{2} n)^3$, which is $\frac{1}{4}$ of original time.
+
+    \subsection{Main application: websecurity}
+
+    Websites starting with https use some protocol before sending the website.
+    It is called TLS (old name SSL), which uses symmetric cryptography.
+    It uses PKI - Public Key Infrastructure, with a certificate.
+
+    \subsection{RSA attacks}
+
+    RSA, factoring can be done in subexponential complexity, which is the main reason why RSA keys are longer than symmetric keys:
+    \begin{itemize}
+        \item QS-quadratic sieve
+        \item NFS - number field seive: $e^{c(N)^{1/3}}$, where $N = \log n$.
+        \item ECM - elliptic curve method
+    \end{itemize}
+
+    There are two types of attacks:
+    \begin{itemize}
+        \item key recovery: recover $p,q$
+        \item message recovery, or at least some information about it
+    \end{itemize}
+
+    Message recovery attacks:
+
+    \subsubsection{Broadcast attack}
+
+    \begin{itemize}
+        \item Assume A,B,C all receive message from X, and public keys are $(n_a,e_a=3)$, $(n_b,e_b=3)$, $(n_c,e_c=3)$.
+        \item $X \to A$: $c_a = m^3 \mod n_a$
+        \item $X \to B$: $c_b = m^3 \mod n_b$
+        \item $X \to C$: $c_c = m^3 \mod n_c$
+        \item E suspects they come from the same plaintext.
+        \item Attacker knows $n_a, n_b, n_c, c_a, c_b, c_c$
+        \item CRT solves:
+        \[
+            x = \begin{cases}
+                &c_a \mod n_a \\
+                    &c_b \mod n_b \\
+                    &c_c \mod n_c
+            \end{cases}
+        \]
+        \item Gives solution modulo $n_a \cdot n_b \cdot n_c$;
+        Note that $m > 0$, $m < n_a$, $m < n_b$, $m < n_c$
+        \[
+            0 < m^3 < n_a \cdot n_b \cdot n_c
+        \]
+        \item So, $m^3 = x$.
+        $x^{1/3}$ easy to compute.
+    \end{itemize}
+
+    \subsubsection{Polynomial dependencies}
+
+    Plaintexts $m_1, m_2$, attacker suspects that $m_2 = a \cdot m_1 + b$, where $a,b$ are known.
+    \begin{itemize}
+        \item Ciphertexts: $c_1 = m^3 \mod n$ and $c_2 = (a m + b)^3 \mod n$
+        \item Attacker computes:
+        \[
+            A = b (c_2 + 2a^3 c_1 - b^3) \mod n
+        \]
+        and
+        \[
+            B = a (c_2 - a^3 c_1 + 2b^3) \mod n
+        \]
+        \item Attacker notices $A = Bm$, which means
+        \[
+            m = A \cdot B^{-1} \mod n
+        \]
+    \end{itemize}
+
+    \subsubsection{Homomorphic Property of RSA}
+
+    If $c_1 = m_1^e \mod n$ and $c_2 = m_2^e \mod n$, then $c_1 \cdot c_2 \mod n$ is the encryption of $m_1 \cdot m_2$.
+    Structure in cyphertexts is bad!
+
+    We exploit this by:
+    \begin{itemize}
+        \item Message: price quote is 100 euros.
+        \item Encrypt only number
+        \item cometitor sees: price quote is $c$ euros.
+        \item Can compute $2^e \mod n$, replace $c$ by $2^e c$ in message.
+        \item Recipient recieves: price quote is 200 euoros.
+    \end{itemize}
+
+    Solution: randomize before you encrypt!
+
+    Key recovery attacks:
+
+    \subsubsection{Fermat factoring method}
+
+    Start with $X = \lceil \sqrt{n} \rceil$, with $Y = X, X+1, X+2, \dots$ do:
+    \begin{itemize}
+        \item Compute $Y^2 - n$, until you find a square.
+        \item If $Y^2 - n = Z^2$, then $n = Y^2 - Z^2 = (Y - Z)(Y + Z) = p \cdot q$.
+    \end{itemize}
+
+    How many tries before you find a solution?
+    $Y - X + 1$, forget about the $+1$.
+    \[
+        Y - X \approx \frac{p+q}{2} - \sqrt{n}
+    \]
+
+    \textbf{Lemma}
+    \[
+        0 < p+q - 2 \sqrt{n} < \frac{(p-q)^2}
+    \]
+
+    \begin{align*}
+        (p-q)^2 &= 4 z^2 \\
+        &= 4(y^2 - n) \\
+        &= 4 (  \frac{(p+q)^2}{4} - n ) \\
+        &= (p+q)^2 - 4n \\
+        &= ((p+q) - 2 \sqrt{n} ) ((p+q) + 2 \sqrt{n})
+        &> 0 \cdot 4 \sqrt{n}
+    \end{align*}
+
+    Conclusion: number of steps in Fermat Factoring is $\approx \frac{(p-q)^2}{8 \sqrt{n}}$.
+    If $|p-q| < c \cdot n^{1/4}$, then trivial!
+    Try this at home.
 
 \end{document}
 
