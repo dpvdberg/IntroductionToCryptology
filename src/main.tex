@@ -1562,6 +1562,10 @@ See Figure~\ref{md}.
             m = A \cdot B^{-1} \mod n
         \]
     \end{itemize}
+    Where do these formula's come from?
+    Idea: compute gcd of $x^3 - c_1$ and $(ax + b)^3 - c_2$, and do this $\mod n$.
+    Do this by multiplying $x^3 - c_1$ with $a^3$ and subtracting this from $(ax + b)^3 - c_2$, one now has a degree two polynomial.
+    Continue this until gcd is found.
 
     \subsubsection{Homomorphic Property of RSA}
 
@@ -1597,7 +1601,7 @@ See Figure~\ref{md}.
 
     \textbf{Lemma}
     \[
-        0 < p+q - 2 \sqrt{n} < \frac{(p-q)^2}
+        0 < p+q - 2 \sqrt{n} < \frac{(p-q)^2}{4 \sqrt n}
     \]
 
     \begin{align*}
@@ -1613,8 +1617,407 @@ See Figure~\ref{md}.
     If $|p-q| < c \cdot n^{1/4}$, then trivial!
     Try this at home.
 
-\end{document}
+    \subsubsection{Bad RNG - Random Number Generation}
 
+    It is essential that you generate your keys with enough randomness.
+    If not, moduli will share prime factors, e.g.:
+    \[
+        n_1 = p_1 q_1 \quad n_2 = p_2 q_1 \text{ with } p_1 = p_2, q_1 \ne q_2
+    \]
+    Is it safe to give two people the same mudulus, but different $d,e$?
+    No!
+    Do not share RSA moduli, because: from only $d,e,n$, you can recover $p,q$.
+
+    How is this possible?
+    \textbf{Special case}: if $e$ is small:
+    \[
+        ed = 1 + k \phi(n)
+    \]
+for some $k \in \reals$.
+    \begin{align*}
+        \phi(n) &= (p-1)(q-1) \\
+        &= n + 1 - (p+q)
+    \end{align*}
+    $p,q \approx 2 \sqrt n$, which means $\phi(n)$ and $n$ share the first half of their bits.
+    This is not a problem, because the second half of the bits you cannot get.
+    However, in this case, we have a good approximation for $\phi(n)$, which is $n$, which means we can get $k$:
+    \[
+        k = \frac{ed - 1}{\phi(n)} \approx \frac{ed-1}{n}
+    \]
+    If $k$ gets too big, then the error gets too large to guess $k$.
+    However, if $k$ is small:
+    \[
+        k = \text{round}(\frac{ed-1}{n})
+    \]
+    If $e$ is small, then $d \approx n$, which means
+    \[
+        k \approx \frac{en}{n} = e
+    \]
+    which means $k$ is also small!
+    Thus, $k$ is known, which means we can compute
+    \[
+        \phi(n) = \frac{ed-1}{k}
+    \]
+    We can no find $p,q$, because $pq=n$ is known.
+$p+q = n+1 - \phi(n)$ is also known.
+    Now, $p,q$ are roots of
+    \[
+        x^2 - (p+q)x + pq = 0
+    \]
+    which is easy to solve!
+
+    \textbf{General case:} $e$ not small:
+    $e,d$ are co-prime to $p-1,q-1$, and $p-1,q-1$ are even, which means $e,d$ are odd.
+    \[
+        ed-1 = 2^s \cdot t, \quad s \ge 1, t \text{ odd}
+    \]
+    Take random $a$, compute
+    \[
+        a^t, a^{2t}, a^{4t}, \dots, a^{2^{st}} \mod n
+    \]
+    The first is a bit of work, while the others can be computed by squaring the previous one.
+    \[
+        a^{2^s \cdot t} = a^{ed-1}= a^{k \cdot \phi(n)}
+    \]
+    Using Euler:
+    \[
+        a^{k \cdot \phi(n)} = 1 \mod n
+    \]
+    Good probability there is some $e \in \set{0,1, \dots, s-1}$, such that $a^{2^i \cdot t} \ne \pm 1 \mod n$, while $a^{2^{i+1} \cdot t} = 1 \mod n$.
+    If that happens, you have $x$ such that
+    \[
+        x \ne \pm 1 \mod n, \quad x^2  = 1 \mod n
+    \]
+    This means $n| x^2 - 1 = (x-1)(x+1)$.
+    $n = pq$, which means if two prime factors $p,q$ are in the same factor, either $x-1$ or $x+1$, then $x = \pm 1$.
+    However, if $p,q$ are in different factors, then $x \ne \pm 1$, which means you can find $p,q$ as $gcd(x \pm 1 n)$.
+    Which means, don't share your modulus!
+
+    \subsubsection{$p-1$ attack}
+
+    Works if $p-1$ has only small prime factors.
+    Let
+    \[
+        M = lcm(2,3,\dots,B)
+    \]
+    Maybe (certainly if $B$ is big enough),
+    \[
+        a = 2^M \mod n
+    \]
+    has a high probability for
+    \[
+        \begin{cases}
+            a &\equiv 1 \mod p \\
+            a &\neg \equiv 1 \mod q
+        \end{cases}
+    \]
+    because with high probability $q-1$ has big prime factor.
+    With high probability, $p$ divides $a-1$, and $q$ does not divide $a-1$.
+    We can get $p$ from $a-1$ by
+    \[
+        gcd(n,a-1) = p
+    \]
+    with high probability.
+
+    How do we avoid this?
+    Use \textit{strong primes}, which are primes $p$ such that $p-1$ has a big prime factors itself.
+
+    \textit{Sophie Germain primes}, which are primes $p$ such that $p-1 = 2 \cdot q$ with $q$ are prime.
+
+    \subsubsection{Microwave attack}
+
+    Assume: use RSA-CRT where private key consisting of
+    \[
+        d_p,d_q,p,q,u \equiv p^{-1} \mod q
+    \]
+    Assume $1$ bit in $d_p$ is wrong.
+    Then, use private key to do decrypt
+    \[
+        c \equiv m^{e} \mod n
+    \]
+    It returns $m'$ such that
+    \[
+        m' \equiv m \mod q \quad m' \neg \equiv m \mod p
+    \]
+    Now
+    \[
+        gcd(n,m'-m) = q.
+    \]
+
+    \subsubsection{Factoring with a hint}
+
+    Not exam material?
+
+    \textbf{d is small},
+    \[
+        d < n^{1/2}
+    \]
+    then
+    \[
+        e \approx n.
+    \]
+    Wiever's attack:
+    \[
+        ed = 1 + k \cdot \phi(n)
+    \]
+    now
+    \[
+        k \approx d \approx n^{1/2}.
+    \]
+    Now:
+    \begin{align*}
+        |\frac{e}{n} - \frac{k}{d}| &= |\frac{ed - kn}{nd}| \\
+        &= | \frac{ed - k \phi(n) + k(\phi(n) - n)}{nd} |
+    \end{align*}
+    Now, $ed - k \phi(n) = 1$ and $\phi(n) - n$ is small, which means:
+    \begin{align*}
+        |\frac{e}{n} - \frac{k}{d}| &= \frac{1 + k (n - \phi(n))}{nd} \\
+        &\approx \frac{n^{1/4}\cdot n^{1/2}}{n \cdot d} \\
+        &= \frac{1}{n^{1/4} d}
+    \end{align*}
+
+    Now $e/d$ is a rational number, $k/d$ is an unknown approximation of this number.
+    We use continued fraction of
+    \[
+        \frac{e}{n} = [a_0,a_1,a_2,\dots]
+    \]
+    gives
+    \[
+        \frac{p_0}{q_0}, \frac{p_1}{q_1},\dots
+    \]
+    such that
+    \[
+        |\frac{e}{n} - \frac{p_i}{q_i} \approx \frac{1}{q_{i+1} \cdot q_i^2}
+    \]
+    Thus, if $\frac{e}{n} - \frac{p}{q} < \frac{1}{2 q^2}$, then $\frac{p}{q} = \frac{p_i}{q_i}$.
+    We want:
+    \[
+        \frac{1}{n^{1/4}d} < \frac{1}{2d^2}
+    \]
+    or equivalently
+    \[
+        d < \frac{1}{2} n^{1/4}
+    \]
+    In this case, $\frac{k}{d}$ leaks from your continued fraction.
+
+    \newpage
+    \section{Security notions}
+
+    \subsection{CPA - Chosen Plaintext Attack}
+
+    Attacker has access to \textit{encryption oracle}, a machine to which you can send a message.
+    It has an encryption key, and when it receives a message, it encrypts with the key that it has, and sends back the message.
+    Attacker can send $m$ of its choice to oracle, and receives $c = Enc_k(m)$.
+    Attacker also has access to decryption oracle, with same key $k$, but he can only ask for $Dec_k(c)$ for which he asked the encryption oracle first.
+
+    \subsection{CCA - Chosen Ciphertext Attack}
+
+    Oracle (challenger) has a secret key/private key and a public key, i.e. a key pair.
+    The public key is published.
+    The challenger chooses a plaintext $m$, oracle encrypts it with $c = Enc_{pk}(m)$..
+
+    \begin{itemize}
+        \item CCA-1: Attacker tries to find $m$.
+        \item CCA-2: Attacker can ask decryption oracle to decrypt (with secret key) any ciphertext, except $c$.
+        Then: attacker tries to find $m$.
+    \end{itemize}
+
+    RSA is not CCA-2-secure.
+    When you have encryption $c$ of $m$, then ask for the decryption of $2^{e} \cdot c$.
+    The decryption oracle will happily give you the answer, which is $2m$.
+    Now the attacker can derive $m$.
+
+    \subsection{Perfect Security}
+
+    The attacker has unbounded capabilities/resources, but the attacker cannot find any information about some plaintext, when given ciphertext.
+
+    \begin{theorem}[Shannon]
+        For perfect security, the key has to be at least as long as the message.
+    \end{theorem}
+
+    OTP is an example of perfect security.
+    For all practical purposes, perfect security is useless.
+
+    \subsection{Semantic Security}
+
+    Attacker has only polynomially bounded resources.
+
+    \subsection{Ciphertext indistinguishability}
+
+    This implies semantic security.
+    A game between challanger and atacker:
+    \begin{itemize}
+        \item Attacker picks $m_0$, $m_1$
+        \item Challanger takes random bit $b_0$, and does not tell the attacker.
+        \item Encrypts $m_b: c_b = Enc_k(m_b)$
+        \item Return $c_b$ to attacker.
+        \item Attacker guesses $b$, say guess is $g$.
+    \end{itemize}
+
+    With deterministic public key systems, attacker can do this!
+
+    Attacker wins the game if he can guess $b$ with a probability that is over $50$ percent.
+    Advantage of the attacker:
+    \[
+        adv(\text{attacker}) = |P_r(g=b) - \frac{1}{2}|
+    \]
+    If this is $>0$, this means the attacker knows something!
+
+    \subsection{PKCS}
+    Use randomized encryption, e.g. by using padding.
+    For RSA, proposal is:
+
+    \textbf{PKCS \# 1} message $M$, do:
+    \[
+        0002 || \text{random padding}||00||M \text{ in bytes}
+    \]
+    The padding should be long enough, so that total fits in modulus byte size.
+    00 is not allowed, because then we don't know where the padding ends.
+
+    This destroys the homomorphic property of RSA.
+
+    Bleichenbacher attacked this padding.
+    \begin{itemize}
+        \item Decryption oracle: upon giving it ciphertext, oracle responds with one bit only.
+        Yes if padding is ok, no if padding is wrong.
+        \item Ask for decyption of $s^e \cdot c$.
+        \item If padding happens to be valid, then $sm$ starts with $0002$.
+        \item This means:
+        \[
+            sm - kn \in [2 \cdot 2^{l-16}, 3 \cdot 2^{l-16}]
+        \]
+        \item Vary $s$ to uncover various parts of $m$.
+    \end{itemize}
+
+    So, don't use PKCS padding.
+    Now: RSA-OAEP padding.
+
+    \newpage
+    \section{DH - Diffie-Hellman}
+
+    \subsection{Environment}
+
+    Let $G = <g>$ be a group,
+    \[
+        G = \set{1 = g^0, g=g^1, g^2, g^3, \dots, g^{q-1}}
+    \]
+    Where $q = \# G$.
+    Now, $g^q = 1$.
+
+    Examples:
+    \begin{itemize}
+        \item $\mathbb{F}_p^* = \set{1,2,3,4,\dots,p-1} \mod p$, where $p$ is prime.
+        \item Elliptic Curve cryptography
+    \end{itemize}
+
+    \subsection{System parameters}
+
+    $G ( = \mathbb{F}_p^*)$, $q$ and $g$.
+
+    \begin{itemize}
+        \item Alice chooses random $x_A \in \set{2,\dots,q-1}$ (private).
+        \item Alice computes $y_a = q^{x_a} \mod p$, which is her public key.
+        \item Bob chooses random $ x_b \in \set{2,\dots,q-1}$ (private).
+        \item Bob computes $y_b = q^{x_b} \mod p$, which is her public key.
+        \item Secret establishment (between just Alice and Bob)
+        \begin{itemize}
+            \item Alice computes $s_a = y_b^{x_a} \mod p$
+            \item Bob computes $s_b = y_a^{x_b} \mod p$
+        \end{itemize}
+    \end{itemize}
+
+    \begin{theorem}
+        \[
+            s_a \equiv s_b \mod p
+        \]
+    \end{theorem}
+
+\begin{proof}
+    \begin{align*}
+        s_a &\equiv y_b^{x_a} \\
+        &\equiv (g^{x_b})^{x_a} \\
+        &= g^{x_b x_a} \\
+        &= g^{x_a x_b} \\
+        & \equiv (g^{x_a})^{s_b} \\
+        &\equiv y_a^{x_b} \\
+        &\equiv s_b
+    \end{align*}
+\end{proof}
+
+    \subsection{CDHP - computational Diffie-Hellman problem}
+
+    Given $y_a, y_b$ such that $y_a = g^{x_a}, y_b = g^{x_b}$, compute $s = g^{x_a x_b}$.
+
+    \subsection{DLP - discrete logarithm problem}
+
+    Given $y \equiv g^x \mod p$, compute $x$.
+    If you can solve DLH, then CDHP can be solved.
+
+    \subsection{DDHP - decision Diffie-Hellman Problem}
+
+    Given $g^{x_a}, g^{x_b}, g^{x_c}$, decide whether $x_c = x_a x_b$.
+    Test for DDHP: give attacker as many examples from either $(g^a,g^b,g^{ab})$ or $(g^a, g^b, g^{\text{random}})$, attacker should guess which it is (random or $ab$).
+    If he can guess with a probability higher than $50$ percent, the attacker knows something.
+
+    In $\mathbb{F}_p^*$, DDHP is easy.
+    We know: $g^{p-1} = 1$.
+    Given $g^a$, compute
+\[
+(g^a)^{\frac{p-1}{2}} = \begin{cases}
+                            1 &\text{ if a even }  \\
+                            \pm 1 &\text{ if a is odd}
+\end{cases}
+\]
+    with $50$ percent probability each.
+    If example was DH-example, guess $a,b,ab$ are even/odd, which are not independent.
+    Should always have a match.
+    If the exmaple was a random example, then with $>0$ probability, this does not have a match.
+
+    \subsection{Baby Step - Giant Step method}
+
+    Attack on DLP.
+    Example: $p=19, g=3, y=12$. Problem: find $x$ such that $12 = 3^x \mod 19$.
+
+    \begin{itemize}
+        \item Take $A = \lceil \sqrt p \rceil = 5$.
+        \item Compute babies, where the top row are $A-1$, see table~\ref{tbl:babies}.
+        and sort them for $g^i$.
+        \item Compute $h = g^{-5} \mod p = 3^{-5} = 3^{13} = -5$.
+        \item Compute giants, see table~\ref{tbl:giants} where y is public key.
+        Stop as soon as we found something in the babies table.
+        \item Now we know:
+        \[
+            12 \cdot g^{-5 j} \equiv g^{i}
+        \]
+        which means
+        \[
+            12 = g^{5j+i}
+        \]
+        which means $x=15$.
+    \end{itemize}
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|l l l l l}
+        i & 0 & 1 & 2 & 3 & 4 \\
+        $g^i$ & 1 & 3 & 9 & 8 & 5
+    \end{tabular}
+    \caption{Babies table}
+    \label{tbl:babies}
+\end{table}
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|l l l l l}
+        j & 0 & 1 & 2 & 3 & 4 \\
+        $y \cdot h^j$ & 12 & 16 & 15 & 1 &
+    \end{tabular}
+    \caption{Giants table}
+    \label{tbl:giants}
+\end{table}
+
+
+\end{document}
 
 
 
